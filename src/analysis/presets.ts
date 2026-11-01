@@ -1,4 +1,4 @@
-import { db, ownPosts, postsInRange, profileNames, type NewspaperMeta, type Post, type ResultKind } from '../db'
+import { db, getAccount, ownPosts, postsInRange, profileNames, type NewspaperMeta, type Post, type ResultKind } from '../db'
 import { PostIndex, SYSTEM_PROMPT, postsBlock, statsSummary } from './prompt'
 import { dedupe, evenSample, matchKeywords, selfMentions, stratifiedSample } from './sampling'
 import { computePower, computeStats, wordRanking } from './stats'
@@ -24,13 +24,15 @@ const DAY = 86400
 const now = () => Math.floor(Date.now() / 1000)
 
 async function context() {
-  const [own, incoming, names] = await Promise.all([ownPosts(), db.incoming.toArray(), profileNames()])
-  return { own, stats: computeStats(own, incoming), index: new PostIndex(names) }
+  const [own, incoming, names, account] = await Promise.all([
+    ownPosts(),
+    db.incoming.toArray(),
+    profileNames(),
+    getAccount(),
+  ])
+  const others = [...names].filter(([pubkey]) => pubkey !== account).map(([, name]) => name)
+  return { own, stats: computeStats(own, incoming), index: new PostIndex(others) }
 }
-
-// 紙面は画像にして共有されるので、他の人が特定できないようにする
-const SHARE_RULE =
-  'この結果は画像として共有されます。他の人の名前、ID、投稿の引用は書かず、必要なら「ある関係者」のようにぼかしてください。'
 
 function build(
   index: PostIndex,
@@ -39,9 +41,8 @@ function build(
   schema?: Record<string, unknown>,
   kind?: ResultKind,
 ): Prepared {
-  const shared = kind ? `\n\n${SHARE_RULE}` : ''
   return {
-    request: { system: SYSTEM_PROMPT, user: `${intro}\n\n${task}${shared}`, schema },
+    request: { system: SYSTEM_PROMPT, user: `${intro}\n\n${task}`, schema },
     citations: index.citations,
     postCount: index.count,
     kind,

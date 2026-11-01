@@ -217,8 +217,32 @@ describe('抽出と引用', () => {
     expect(picked).toHaveLength(100)
     expect(picked.filter((p) => old.includes(p)).length).toBe(50)
   })
+  it('他の人の投稿は名前と宛先を消して渡す', () => {
+    const index = new PostIndex()
+    const other = post({
+      source: 'tl',
+      pubkey: 'f'.repeat(64),
+      content: 'nostr:npub1abcdef こんにちは nostr:note1xyz',
+    })
+    const line = index.line(other)
+    expect(line).toContain('TLの誰か: こんにちは')
+    expect(line).not.toContain('npub1')
+    expect(line).not.toContain('note1')
+    expect(line).not.toContain('f'.repeat(8))
+  })
+  it('本文の平文の npub も消す', () => {
+    expect(new PostIndex().line(post({ source: 'tl', content: 'npub1abc123 さん' }))).toContain('TLの誰か: さん')
+  })
+  it('本文に書かれた他の人の名前を伏せる', () => {
+    const index = new PostIndex(['たろうさん', 'たろう', 'A.B*C', 'ねこ'])
+    expect(index.line(post({ source: 'tl', content: 'たろうさんとA.B*Cが来た' }))).toContain('誰かと誰かが来た')
+    expect(index.line(post({ content: '今日はたろうに会った' }))).toContain('私: 今日は誰かに会った')
+  })
+  it('短い名前は普通の言葉と重なるので伏せない', () => {
+    expect(new PostIndex(['ねこ']).line(post({ content: 'ねこがいた' }))).toContain('ねこがいた')
+  })
   it('同じ投稿には同じ番号を振る', () => {
-    const index = new PostIndex(new Map())
+    const index = new PostIndex()
     const p = post({ content: 'こんにちは' })
     expect(index.line(p)).toBe(index.line(p))
     expect(index.count).toBe(1)
