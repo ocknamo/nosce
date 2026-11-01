@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { identify, type Signer } from '../nostr/identity'
+import { explainNosskeyError, nosskeySigner, NOSSKEY_URL } from '../nostr/nosskey'
 import { connectBunker, createConnectRequest, waitForSigner } from '../nostr/remoteSigner'
 
 const NOT_OWNER = 'このアカウントの鍵で署名してください。'
@@ -9,6 +10,7 @@ export function SignerLogin({ expected, onDone }: { expected?: string; onDone: (
   const [bunker, setBunker] = useState('')
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [needKey, setNeedKey] = useState(false)
   const [copied, setCopied] = useState(false)
   const abort = useRef<AbortController | null>(null)
 
@@ -23,10 +25,17 @@ export function SignerLogin({ expected, onDone }: { expected?: string; onDone: (
 
   const run = async (start: () => Promise<void>) => {
     setError('')
+    setNeedKey(false)
     try {
       await start()
     } catch (err) {
       if (abort.current?.signal.aborted) return
+      const nosskey = explainNosskeyError(err)
+      if (nosskey) {
+        setError(nosskey.message)
+        setNeedKey(nosskey.needKey)
+        return
+      }
       setError(err instanceof Error && /[ぁ-ん]/.test(err.message) ? err.message : '確認できませんでした。もう一度試してください。')
     } finally {
       setBusy('')
@@ -38,6 +47,19 @@ export function SignerLogin({ expected, onDone }: { expected?: string; onDone: (
       if (!window.nostr) throw new Error('NIP-07対応の拡張機能が見つかりません。')
       await finish(window.nostr)
     })
+
+  // iframe はページを閉じるまで残す(作り直すとストレージの許可を聞き直すことになる)
+  // 二度押しで承認画面を重ねて出さない
+  const passkeyRunning = useRef(false)
+  const usePasskey = async () => {
+    if (passkeyRunning.current) return
+    passkeyRunning.current = true
+    await run(async () => {
+      setBusy('nosskey.appの画面で承認してください…')
+      await finish(await nosskeySigner())
+    })
+    passkeyRunning.current = false
+  }
 
   const useApp = () => {
     abort.current?.abort()
@@ -73,8 +95,11 @@ export function SignerLogin({ expected, onDone }: { expected?: string; onDone: (
           拡張機能で確認
         </button>
         <button onClick={useApp}>署名アプリで確認</button>
+        <button onClick={usePasskey}>パスキーで確認</button>
       </div>
-      <p className="muted small">パソコンはNIP-07の拡張機能、スマホはAmberなどの署名アプリが使えます。</p>
+      <p className="muted small">
+        パソコンはNIP-07の拡張機能、スマホはAmberなどの署名アプリが使えます。パスキーは nosskey.app に保存したもの(Nosskey)を使います。
+      </p>
 
       {connectUri && (
         <div className="signer-connect">
@@ -101,7 +126,19 @@ export function SignerLogin({ expected, onDone }: { expected?: string; onDone: (
       </details>
 
       {busy && <p className="small">{busy}</p>}
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+          {needKey && (
+            <>
+              {' '}
+              <a href={NOSSKEY_URL} target="_blank" rel="noopener noreferrer">
+                nosskey.appを開く
+              </a>
+            </>
+          )}
+        </p>
+      )}
     </div>
   )
 }
