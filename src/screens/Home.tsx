@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { db, getKv, getSettings, profileNames, setKv } from '../db'
-import { proveOwnership } from '../nostr/identity'
+import { SignerLogin } from '../components/SignerLogin'
 import { complete, connectionFrom, estimate, explainError, formatCost, type LlmRequest } from '../analysis/llm'
 import { PROVIDERS, type Connection } from '../analysis/providers'
 import { ALL_PRESETS } from '../analysis/morePresets'
@@ -32,6 +32,7 @@ export function Home({ sync, account, go }: { sync: SyncState; account: string; 
   const [busy, setBusy] = useState('')
   const [stream, setStream] = useState('')
   const [error, setError] = useState('')
+  const [needProof, setNeedProof] = useState(false)
   const abort = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -49,27 +50,16 @@ export function Home({ sync, account, go }: { sync: SyncState; account: string; 
     return () => clearInterval(t)
   }, [sync.running, account])
 
-  const prove = async () => {
-    if (!window.nostr) {
-      setError('本人確認にはNIP-07対応の拡張機能(nos2x、Albyなど)が必要です。インストールしてから試してください。')
-      return
-    }
-    try {
-      if (await proveOwnership(account, window.nostr)) {
-        await setKv('verifiedAccount', account)
-        setError('')
-      } else {
-        setError('本人確認できませんでした。このアカウントの鍵で署名してください。')
-      }
-    } catch {
-      setError('署名が取り消されたため、本人確認できませんでした。')
-    }
+  const verified = async () => {
+    await setKv('verifiedAccount', account)
+    setNeedProof(false)
+    setError('')
   }
 
   const needConnection = async () => {
     // 他の人のアカウントをAIに評価させないよう、本人だけに限る。手元の開発時は省く
     if (!import.meta.env.DEV && (await getKv('verifiedAccount')) !== account) {
-      setError('AI分析には本人確認が必要です。')
+      setNeedProof(true)
       return null
     }
     const conn = connectionFrom(await getSettings())
@@ -216,14 +206,17 @@ export function Home({ sync, account, go }: { sync: SyncState; account: string; 
                 設定を開く
               </button>
             )}
-            {error.includes('本人確認') && (
-              <button className="link" onClick={prove}>
-                本人確認する
-              </button>
-            )}
           </p>
         )}
       </section>
+
+      {needProof && (
+        <section className="card confirm">
+          <h2>本人確認</h2>
+          <p className="muted small">AI分析は、アカウントの持ち主だけが使えます。確認すると、もう一度プリセットを押せます。</p>
+          <SignerLogin expected={account} onDone={verified} />
+        </section>
+      )}
 
       {pending && (
         <section className="card confirm">

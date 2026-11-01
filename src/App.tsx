@@ -111,10 +111,11 @@ export function App() {
         ) : (
           <Setup
             onAbout={() => setShowAbout(true)}
-            onStart={async (pubkey) => {
+            onStart={async (pubkey, verified) => {
               // ブラウザの容量が足りないときに取得データを自動で消されにくくする
               void navigator.storage?.persist?.()
               await setKv('account', pubkey)
+              if (verified) await setKv('verifiedAccount', pubkey)
               setAccount(pubkey)
               void startSync(pubkey)
             }}

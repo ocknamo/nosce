@@ -238,6 +238,14 @@ input[type='checkbox'] { width: auto; }
 .about > button { margin-bottom: 12px; }
 .about a { color: var(--accent); }
 .setup-note { margin: 12px 0 0; }
+.setup h2 { margin-top: 16px; }
+.setup-or { border-top: 1px solid var(--line); padding-top: 14px; }
+.setup .row button { white-space: nowrap; }
+.signer { display: flex; flex-direction: column; gap: 8px; }
+.signer p { margin: 0; }
+.signer-connect { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.signer-open { background: var(--accent); color: var(--bg); text-decoration: none; padding: 7px 14px; border-radius: 8px; }
+.signer details .row { margin-top: 6px; }
 .notice { background: var(--accent-soft); color: var(--accent); border-radius: 8px; padding: 8px 12px; font-size: 14px; }
 .login { margin-bottom: 12px; }
 .login p { margin: 4px 0 0; }

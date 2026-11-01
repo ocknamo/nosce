@@ -4,7 +4,7 @@ import { finalizeEvent, generateSecretKey, getPublicKey, type Event } from 'nost
 import { nip19 } from 'nostr-tools'
 import { db, type Post } from './db'
 import { parseAccount, saveEvents } from './nostr/events'
-import { proveOwnership } from './nostr/identity'
+import { identify, proveOwnership } from './nostr/identity'
 import { normalizeRelays, planRelays } from './nostr/relays'
 import { nextAfterIdle } from './nostr/sync'
 import {
@@ -179,6 +179,24 @@ describe('proveOwnership', () => {
       }),
     }
     expect(await proveOwnership(me, forged)).toBe(false)
+  })
+})
+
+describe('identify', () => {
+  const signerFor = (key: Uint8Array) => ({
+    getPublicKey: async () => getPublicKey(key),
+    signEvent: async (template: Parameters<typeof finalizeEvent>[0]) => finalizeEvent(template, key),
+  })
+
+  it('初回ログインでは署名した鍵を持ち主として返す', async () => {
+    expect(await identify(signerFor(sk))).toBe(me)
+  })
+  it('登録済みのアカウントと違う鍵は受け付けない', async () => {
+    expect(await identify(signerFor(generateSecretKey()), me)).toBeNull()
+  })
+  it('公開鍵だけ偽っても、署名できなければ受け付けない', async () => {
+    const liar = { ...signerFor(generateSecretKey()), getPublicKey: async () => me }
+    expect(await identify(liar, me)).toBeNull()
   })
 })
 
