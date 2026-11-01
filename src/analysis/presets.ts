@@ -1,4 +1,14 @@
-import { db, getAccount, ownPosts, postsInRange, profileNames, type NewspaperMeta, type Post, type ResultKind } from '../db'
+import {
+  db,
+  getAccount,
+  ownPosts,
+  postsInRange,
+  profileNames,
+  type NewspaperMeta,
+  type Post,
+  type ResultBody,
+  type ResultKind,
+} from '../db'
 import { PostIndex, SYSTEM_PROMPT, postsBlock, statsSummary } from './prompt'
 import { dedupe, evenSample, matchKeywords, selfMentions, stratifiedSample } from './sampling'
 import { computePower, computeStats, wordRanking } from './stats'
@@ -18,12 +28,13 @@ export type Preset = {
   desc: string
   free?: boolean
   prepare?: () => Promise<Prepared>
+  run?: () => Promise<ResultBody>
 }
 
 const DAY = 86400
 const now = () => Math.floor(Date.now() / 1000)
 
-async function context() {
+export async function context() {
   const [own, incoming, names, account] = await Promise.all([
     ownPosts(),
     db.incoming.toArray(),
@@ -34,7 +45,7 @@ async function context() {
   return { own, stats: computeStats(own, incoming), index: new PostIndex(others) }
 }
 
-function build(
+export function build(
   index: PostIndex,
   intro: string,
   task: string,
@@ -49,18 +60,19 @@ function build(
   }
 }
 
-const STRING = { type: 'string' }
-const INTEGER = { type: 'integer' }
-const EVIDENCE = { type: 'array', items: STRING }
+export const STRING = { type: 'string' }
+export const INTEGER = { type: 'integer' }
+export const EVIDENCE = { type: 'array', items: STRING }
+export const STRINGS = EVIDENCE
 
-const obj = (properties: Record<string, unknown>) => ({
+export const obj = (properties: Record<string, unknown>) => ({
   type: 'object',
   additionalProperties: false,
   required: Object.keys(properties),
   properties,
 })
 
-const listOf = (properties: Record<string, unknown>) => ({ type: 'array', items: obj(properties) })
+export const listOf = (properties: Record<string, unknown>) => ({ type: 'array', items: obj(properties) })
 
 export const AWARD_SCHEMA = obj({
   title: STRING,

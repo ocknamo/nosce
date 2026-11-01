@@ -131,6 +131,15 @@ export function tokenize(text: string, segmenter: Intl.Segmenter): string[] {
   return out
 }
 
+export function countWords(posts: Post[]) {
+  const segmenter = new Intl.Segmenter('ja', { granularity: 'word' })
+  const counts = new Map<string, number>()
+  for (const p of posts) {
+    for (const w of tokenize(p.content, segmenter)) counts.set(w, (counts.get(w) ?? 0) + 1)
+  }
+  return counts
+}
+
 export type WordCount = { word: string; count: number }
 
 export type WordRanking = { years: WordYear[]; hall: WordCount[] }

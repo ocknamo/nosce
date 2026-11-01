@@ -7,6 +7,15 @@ import { parseAccount, saveEvents } from './nostr/events'
 import { proveOwnership } from './nostr/identity'
 import { normalizeRelays, planRelays } from './nostr/relays'
 import { nextAfterIdle } from './nostr/sync'
+import {
+  ALL_PRESETS,
+  calendarData,
+  greetingData,
+  householdData,
+  reportCard,
+  stampData,
+  trendWords,
+} from './analysis/morePresets'
 import { walkRange, type FetchPage } from './nostr/walk'
 import { computeStats, computePower, wordRanking } from './analysis/stats'
 import { stratifiedSample } from './analysis/sampling'
@@ -206,6 +215,65 @@ describe('統計', () => {
     const { years, hall } = wordRanking(Array.from({ length: 3 }, () => post({ content: 'ラーメン', created_at })))
     expect(hall).toEqual([])
     expect(years[0].words[0].word).toBe('ラーメン')
+  })
+})
+
+describe('追加のプリセット', () => {
+  const at = Date.UTC(2026, 5, 15, 3) / 1000
+
+  it('全プリセットのIDが重複せず、無料は run か既存の集計を持つ', () => {
+    const ids = ALL_PRESETS.map((p) => p.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids).toHaveLength(24)
+    for (const p of ALL_PRESETS) expect(!!p.free || !!p.prepare).toBe(true)
+  })
+  it('通知表の評価は1から5に収まる', () => {
+    const best = reportCard({ ...computeStats([], []), activeDays: 10, spanDays: 10, perDay: 200, replyRate: 1, avgLength: 200, reactionsPerPost: 9 })
+    expect(best.items.every((i) => i.score === 5)).toBe(true)
+    const worst = reportCard({ ...computeStats([], []), nightRate: 1 })
+    expect(worst.items.every((i) => i.score === 1)).toBe(true)
+    expect(worst.comment).toContain('もう少しがんばりましょう')
+  })
+  it('カレンダーは日ごとに数えて最多の日を出す', () => {
+    const posts = [post({ created_at: at }), post({ created_at: at + 60 }), post({ created_at: at + 86400 })]
+    const data = calendarData(posts)
+    expect(data.total).toBe(3)
+    expect(data.days).toBe(2)
+    expect(data.best?.count).toBe(2)
+  })
+  it('家計簿は投稿を支出、反応を収入にする', () => {
+    const data = householdData(
+      [post({ created_at: at })],
+      [
+        { id: 'r', kind: 7, pubkey: 'p', created_at: at },
+        { id: 'z', kind: 9735, pubkey: 'p', created_at: at },
+      ],
+      new Date(2026, 5, 20),
+    )
+    expect(data.rows).toHaveLength(12)
+    expect(data.expense).toBe(1)
+    expect(data.income).toBe(11)
+    expect(data.balance).toBe(10)
+  })
+  it('年賀状は最後の投稿の年を集計する', () => {
+    const data = greetingData([post({ created_at: at, content: 'ラーメン ラーメン カレー' })], [])
+    expect(data).toMatchObject({ year: 2026, nextYear: 2027, total: 1, topWord: 'ラーメン' })
+  })
+  it('切手は最初の投稿と経過日数を出し、空でも落ちない', () => {
+    expect(stampData([post({ created_at: at, content: 'はじめまして' })], at + 86400)).toMatchObject({
+      firstText: 'はじめまして',
+      days: 2,
+      total: 1,
+    })
+    expect(stampData([], at).total).toBe(0)
+  })
+  it('流行語くらべは自分だけ、TLだけの言葉を分け、人の名前を除く', () => {
+    const mine = new Map([['ダーツ', 5], ['ラーメン', 3]])
+    const tl = new Map([['ラーメン', 50], ['選挙', 40], ['たろう', 90]])
+    const data = trendWords(mine, tl, ['たろう'])
+    expect(data.tlTop.map((w) => w.word)).toEqual(['ラーメン', '選挙'])
+    expect(data.ignored.map((w) => w.word)).toEqual(['選挙'])
+    expect(data.onlyMine.map((w) => w.word)).toEqual(['ダーツ'])
   })
 })
 

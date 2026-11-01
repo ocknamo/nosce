@@ -3,11 +3,17 @@ import { db, getKv, getSettings, profileNames, setKv } from '../db'
 import { proveOwnership } from '../nostr/identity'
 import { complete, connectionFrom, estimate, explainError, formatCost, type LlmRequest } from '../analysis/llm'
 import { PROVIDERS, type Connection } from '../analysis/providers'
-import { PRESETS, planRequest, prepareQuestion, runFreePreset, type Prepared, type Preset, type QuestionPlan } from '../analysis/presets'
+import { ALL_PRESETS } from '../analysis/morePresets'
+import { planRequest, prepareQuestion, runFreePreset, type Prepared, type Preset, type QuestionPlan } from '../analysis/presets'
 import { parseJson, toBody } from '../analysis/result'
 import { SyncPanel } from '../components/SyncPanel'
 import { formatTime } from '../analysis/prompt'
 import type { Route, SyncState } from '../App'
+
+const GROUPS = [
+  { title: 'AIで遊ぶ', free: false },
+  { title: '無料で遊ぶ', free: true },
+]
 
 type Pending = {
   title: string
@@ -97,7 +103,7 @@ export function Home({ sync, account, go }: { sync: SyncState; account: string; 
     setBusy(`${preset.title}を準備中…`)
     try {
       if (preset.free) {
-        const body = await runFreePreset(preset.id)
+        const body = preset.run ? await preset.run() : await runFreePreset(preset.id)
         const id = await db.results.add({
           title: preset.title,
           presetId: preset.id,
@@ -253,16 +259,20 @@ export function Home({ sync, account, go }: { sync: SyncState; account: string; 
         </section>
       )}
 
-      <h2 className="section">プリセット</h2>
-      <div className="grid">
-        {PRESETS.map((p) => (
-          <button key={p.id} className="preset" onClick={() => startPreset(p)} disabled={!!busy}>
-            <b>{p.title}</b>
-            <span className="muted small">{p.desc}</span>
-            <span className={p.free ? 'tag free' : 'tag'}>{p.free ? '無料' : 'AI'}</span>
-          </button>
-        ))}
-      </div>
+      {GROUPS.map(({ title, free }) => (
+        <div key={title}>
+          <h2 className="section">{title}</h2>
+          <div className="grid">
+            {ALL_PRESETS.filter((p) => !!p.free === free).map((p) => (
+              <button key={p.id} className="preset" onClick={() => startPreset(p)} disabled={!!busy}>
+                <b>{p.title}</b>
+                <span className="muted small">{p.desc}</span>
+                <span className={p.free ? 'tag free' : 'tag'}>{p.free ? '無料' : 'AI'}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
 
       {(sync.running || sync.error || sync.failed.length > 0) && (
         <>

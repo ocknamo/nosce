@@ -3,6 +3,7 @@ import { toPng } from 'html-to-image'
 import { db, getAccount, profileNames, type AppraisalItem, type SavedResult } from '../db'
 import { Newspaper } from '../components/Newspaper'
 import { AppraisalSheet, AwardSheet, DialogueSheet, DriftSheet, PowerSheet, WordsSheet } from '../components/Sheets'
+import { ThemeSheet } from '../components/ThemeSheets'
 import { formatCost } from '../analysis/llm'
 import { hitRate, splitCitations } from '../analysis/result'
 import type { Power, WordRanking, WordYear } from '../analysis/stats'
@@ -97,6 +98,10 @@ function evidenceRows(result: SavedResult): EvidenceRow[] {
         ...body.paper.articles.slice(0, 3),
         body.paper.column,
       ]
+    case 'sheet': {
+      const { evidence } = body.data as { evidence?: string[] }
+      return evidence?.length ? [{ title: '根拠にした投稿', evidence }] : []
+    }
     case 'award':
       return [{ title: body.award.title, evidence: body.award.evidence }]
     case 'dialogue':
@@ -203,6 +208,9 @@ export function Result({ id, go }: { id: number; go: Go }) {
         {body.type === 'award' && <AwardSheet award={body.award} name={name} createdAt={createdAt} />}
         {body.type === 'drift' && <DriftSheet drift={body.drift} name={name} createdAt={createdAt} />}
         {body.type === 'dialogue' && <DialogueSheet dialogue={body.dialogue} name={name} />}
+        {body.type === 'sheet' && (
+          <ThemeSheet id={result.presetId} data={body.data} name={name} createdAt={createdAt} />
+        )}
         {body.type === 'power' && <PowerSheet data={body.data as Power} name={name} />}
         {body.type === 'words' && <WordsSheet data={body.data as WordRanking | WordYear[]} name={name} />}
       </div>

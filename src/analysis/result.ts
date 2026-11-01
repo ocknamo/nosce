@@ -20,6 +20,8 @@ export function toBody(text: string, kind?: ResultKind, meta?: NewspaperMeta): R
       return { type: kind, drift: parsed }
     case 'dialogue':
       return { type: kind, dialogue: parsed }
+    case 'sheet':
+      return { type: kind, data: parsed }
   }
 }
 

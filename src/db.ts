@@ -82,10 +82,12 @@ export type Dialogue = {
   evidence: string[]
 }
 
-export type ResultKind = 'newspaper' | 'appraisal' | 'award' | 'drift' | 'dialogue'
+export type ResultKind = 'newspaper' | 'appraisal' | 'award' | 'drift' | 'dialogue' | 'sheet'
 
 export type ResultBody =
   | { type: 'text'; text: string }
+  // presetId で紙面を選ぶ汎用の結果
+  | { type: 'sheet'; data: unknown }
   | { type: 'appraisal'; items: AppraisalItem[] }
   | { type: 'award'; award: Award }
   | { type: 'drift'; drift: Drift }
