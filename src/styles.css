@@ -146,6 +146,10 @@ input[type='checkbox'] { width: auto; }
 .award-show header { text-align: center; border: 3px solid #d9b54a; outline: 1px solid #d9b54a; outline-offset: 5px; padding: 22px; margin-bottom: 34px; }
 .award-show header small { font-size: 21px; color: #d9b54a; }
 .award-show h1 { font-size: 66px; font-weight: 800; color: #f5d97a; letter-spacing: 0.08em; }
+.as-hall { border: 2px solid #d9b54a; padding: 16px 22px; margin-bottom: 26px; }
+.as-hall h2 { font-size: 30px; font-weight: 800; color: #f5d97a; text-align: center; letter-spacing: 0.3em; margin-bottom: 8px; }
+.as-hall ol { margin: 0; padding-left: 40px; columns: 2; column-gap: 28px; font-size: 22px; line-height: 1.7; }
+.as-hall li small { font-size: 16px; color: #d9b54a; }
 .as-year { display: grid; grid-template-columns: 430px minmax(0, 1fr); gap: 26px; padding: 22px 0; border-top: 1px solid #d9b54a; }
 .as-year:first-of-type { border-top: 0; }
 .as-grand { background: #d9b54a; color: #3b0810; text-align: center; padding: 20px 14px; display: flex; flex-direction: column; justify-content: center; align-items: center; overflow-wrap: anywhere; }

@@ -131,33 +131,53 @@ export function tokenize(text: string, segmenter: Intl.Segmenter): string[] {
   return out
 }
 
-// 単純な回数だと毎年同じ語が並ぶので、その年に偏っている語を上に出す
-export function wordRanking(posts: Post[], top = 10): WordYear[] {
+export type WordCount = { word: string; count: number }
+
+export type WordRanking = { years: WordYear[]; hall: WordCount[] }
+
+// 殿堂入りを判定するときに見る、各年の上位の語数
+const HALL_RANGE = 60
+
+// 毎年上位に入る言葉は殿堂入りとして別枠にし、残りの言葉を年ごとに回数の多い順に並べる
+export function wordRanking(posts: Post[], top = 10): WordRanking {
   const segmenter = new Intl.Segmenter('ja', { granularity: 'word' })
   const byYear = new Map<string, Map<string, number>>()
-  const totals = new Map<string, number>()
   for (const p of posts) {
     const year = String(new Date(p.created_at * 1000).getFullYear())
     const counts = byYear.get(year) ?? new Map<string, number>()
     byYear.set(year, counts)
     for (const w of tokenize(p.content, segmenter)) {
       counts.set(w, (counts.get(w) ?? 0) + 1)
-      totals.set(w, (totals.get(w) ?? 0) + 1)
     }
   }
-  const allWords = [...totals.values()].reduce((a, b) => a + b, 0)
-  return [...byYear.keys()].sort().map((year) => {
-    const counts = byYear.get(year)!
-    const yearWords = [...counts.values()].reduce((a, b) => a + b, 0)
-    const score = (word: string, n: number) => {
-      const lift = n / yearWords / (totals.get(word)! / allWords)
-      return n * Math.max(Math.log(lift), 0)
-    }
-    const words = [...counts]
+  const ranked = [...byYear.keys()].sort().map((year) => ({
+    year,
+    words: [...byYear.get(year)!]
       .filter(([, n]) => n >= 3)
-      .sort(([a, x], [b, y]) => score(b, y) - score(a, x) || y - x)
+      .sort(([, x], [, y]) => y - x)
+      .map(([word, count]) => ({ word, count })),
+  }))
+
+  const needed = Math.max(2, Math.ceil(ranked.length / 2))
+  const appearances = new Map<string, number>()
+  for (const { words } of ranked) {
+    for (const { word } of words.slice(0, HALL_RANGE)) {
+      appearances.set(word, (appearances.get(word) ?? 0) + 1)
+    }
+  }
+  const isHall = (word: string) => (appearances.get(word) ?? 0) >= needed
+
+  const totals = new Map<string, number>()
+  for (const { words } of ranked) {
+    for (const { word, count } of words) {
+      if (isHall(word)) totals.set(word, (totals.get(word) ?? 0) + count)
+    }
+  }
+  return {
+    years: ranked.map(({ year, words }) => ({ year, words: words.filter((w) => !isHall(w.word)).slice(0, top) })),
+    hall: [...totals]
+      .sort(([, x], [, y]) => y - x)
       .slice(0, top)
-      .map(([word, count]) => ({ word, count }))
-    return { year, words }
-  })
+      .map(([word, count]) => ({ word, count })),
+  }
 }

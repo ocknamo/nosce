@@ -127,7 +127,7 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
 
 export const PRESETS: Preset[] = [
   { id: 'power', title: 'Nostr戦闘力', desc: '投稿の傾向をRPGのステータスに', free: true },
-  { id: 'words', title: 'My流行語大賞', desc: 'その年らしい言葉のランキング', free: true },
+  { id: 'words', title: 'My流行語大賞', desc: '毎年の定番は殿堂入り、その年の言葉で大賞を決める', free: true },
   {
     id: 'newspaper',
     title: '週刊じぶん新聞',

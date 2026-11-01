@@ -5,7 +5,7 @@ import { Newspaper } from '../components/Newspaper'
 import { AppraisalSheet, AwardSheet, DialogueSheet, DriftSheet, PowerSheet, WordsSheet } from '../components/Sheets'
 import { formatCost } from '../analysis/llm'
 import { hitRate, splitCitations } from '../analysis/result'
-import type { Power, WordYear } from '../analysis/stats'
+import type { Power, WordRanking, WordYear } from '../analysis/stats'
 import type { Route } from '../App'
 
 type Go = (r: Route) => void
@@ -204,7 +204,7 @@ export function Result({ id, go }: { id: number; go: Go }) {
         {body.type === 'drift' && <DriftSheet drift={body.drift} name={name} createdAt={createdAt} />}
         {body.type === 'dialogue' && <DialogueSheet dialogue={body.dialogue} name={name} />}
         {body.type === 'power' && <PowerSheet data={body.data as Power} name={name} />}
-        {body.type === 'words' && <WordsSheet data={body.data as WordYear[]} name={name} />}
+        {body.type === 'words' && <WordsSheet data={body.data as WordRanking | WordYear[]} name={name} />}
       </div>
       <CheckPanel result={result} go={go} onCheck={onCheck} />
       <EvidenceList rows={evidenceRows(result)} citations={citations} go={go} />

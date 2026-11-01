@@ -1,5 +1,5 @@
 import { hitRate, stripTags, tate } from '../analysis/result'
-import type { Power, WordYear } from '../analysis/stats'
+import type { Power, WordRanking, WordYear } from '../analysis/stats'
 import type { AppraisalItem, Award, Dialogue, Drift } from '../db'
 import { Fit, ScaledSheet, formatDate } from './sheet'
 
@@ -71,14 +71,28 @@ export function PowerSheet({ data, name }: { data: Power; name: string }) {
   )
 }
 
-export function WordsSheet({ data, name }: { data: WordYear[]; name: string }) {
-  const years = [...data].reverse().filter((y) => y.words.length)
+export function WordsSheet({ data, name }: { data: WordRanking | WordYear[]; name: string }) {
+  // 殿堂入りを入れる前に保存した結果は、年ごとの配列のまま残っている
+  const { years: all, hall } = Array.isArray(data) ? { years: data, hall: [] } : data
+  const years = [...all].reverse().filter((y) => y.words.length)
   return (
     <ScaledSheet width={1000} className="award-show">
       <header>
         <small>{name} 選出</small>
         <h1>My流行語大賞</h1>
       </header>
+      {hall.length > 0 && (
+        <section className="as-hall">
+          <h2>殿堂入り</h2>
+          <ol>
+            {hall.map((w) => (
+              <li key={w.word}>
+                {w.word} <small>{w.count.toLocaleString()}回</small>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       {years.map((y) => (
         <section key={y.year} className="as-year">
           <div className="as-grand">

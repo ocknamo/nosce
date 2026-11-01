@@ -184,17 +184,28 @@ describe('統計', () => {
     expect(s.replyRate).toBe(0.5)
     expect(s.reactionsPerPost).toBe(0.5)
   })
-  it('流行語は年ごとの偏りを優先する', () => {
+  it('毎年上位の言葉は殿堂入りにし、残りを回数の多い順に並べる', () => {
     const y2023 = Date.UTC(2023, 5, 1) / 1000
     const y2024 = Date.UTC(2024, 5, 1) / 1000
     const posts = [
-      ...Array.from({ length: 5 }, () => post({ content: '量子コンピュータ https://a.example/ラーメン', created_at: y2023 })),
-      ...Array.from({ length: 5 }, () => post({ content: 'ラーメン', created_at: y2024 })),
+      ...Array.from({ length: 5 }, () => post({ content: 'ラーメン カレー https://a.example/ソバ', created_at: y2023 })),
+      ...Array.from({ length: 3 }, () => post({ content: 'ラーメン パスタ', created_at: y2023 })),
+      ...Array.from({ length: 5 }, () => post({ content: 'ラーメン ﾍﾟ', created_at: y2024 })),
     ]
-    const result = wordRanking(posts)
-    expect(result.map((r) => r.year)).toEqual(['2023', '2024'])
-    expect(result[1].words[0].word).toBe('ラーメン')
-    expect(result[0].words.some((w) => w.word === 'ラーメン')).toBe(false)
+    const { years, hall } = wordRanking(posts)
+    expect(hall).toEqual([{ word: 'ラーメン', count: 13 }])
+    expect(years.map((y) => y.year)).toEqual(['2023', '2024'])
+    expect(years[0].words).toEqual([
+      { word: 'カレー', count: 5 },
+      { word: 'パスタ', count: 3 },
+    ])
+    expect(years[1].words).toEqual([{ word: 'ﾍﾟ', count: 5 }])
+  })
+  it('1年分しかなければ殿堂入りを作らない', () => {
+    const created_at = Date.UTC(2023, 5, 1) / 1000
+    const { years, hall } = wordRanking(Array.from({ length: 3 }, () => post({ content: 'ラーメン', created_at })))
+    expect(hall).toEqual([])
+    expect(years[0].words[0].word).toBe('ラーメン')
   })
 })
 
