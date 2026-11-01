@@ -462,3 +462,8 @@ input[type='checkbox'] { width: auto; }
   .tl-head, .tl-row { grid-template-columns: 42px minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
   .check-row { grid-template-columns: 96px minmax(0, 1fr) auto; }
 }
+/* Nosskey の署名画面。ページ内のどの要素よりも上に出す */
+.nosskey-overlay { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 1rem; pointer-events: none; background: transparent; }
+.nosskey-overlay.visible { pointer-events: auto; background: rgba(0, 0, 0, 0.45); }
+.nosskey-overlay iframe { width: min(420px, 100%); height: min(560px, 90vh); border: 0; border-radius: 12px; background: #fff; pointer-events: auto; }
+.nosskey-overlay.dark iframe { background: #141414; }

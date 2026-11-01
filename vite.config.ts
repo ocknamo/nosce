@@ -10,6 +10,8 @@ const CSP = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   "connect-src 'self' data: wss: https://api.anthropic.com https://openrouter.ai",
+  // パスキーでの本人確認(Nosskey)の署名画面
+  "frame-src https://nosskey.app",
   "base-uri 'none'",
   "form-action 'none'",
 ].join('; ')
