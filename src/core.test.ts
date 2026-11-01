@@ -6,6 +6,7 @@ import { db, type Post } from './db'
 import { parseAccount, saveEvents } from './nostr/events'
 import { proveOwnership } from './nostr/identity'
 import { normalizeRelays, planRelays } from './nostr/relays'
+import { nextAfterIdle } from './nostr/sync'
 import { walkRange, type FetchPage } from './nostr/walk'
 import { computeStats, computePower, wordRanking } from './analysis/stats'
 import { stratifiedSample } from './analysis/sampling'
@@ -60,6 +61,50 @@ describe('walkRange', () => {
     const got = new Set<string>()
     await walkRange(fakeRelay(all, 5), { kinds: [1] }, 2000, 0, async (ev) => ev.forEach((e) => got.add(e.id)))
     expect(got.has(all[8].id)).toBe(true)
+  })
+})
+
+describe('walkRange の終了条件', () => {
+  it('until を無視して同じページを返すリレーでも終わる', async () => {
+    const all = Array.from({ length: 5 }, (_, i) => sign(1, `p${i}`, 1000 + i))
+    let pages = 0
+    await walkRange(
+      async () => {
+        if (++pages > 20) throw new Error('終わらない')
+        return all
+      },
+      { kinds: [1] },
+      2000,
+      0,
+      async () => {},
+    )
+    expect(pages).toBeLessThanOrEqual(3)
+  })
+  it('onPage の指定した時刻まで飛ばす', async () => {
+    const all = Array.from({ length: 100 }, (_, i) => sign(1, `p${i}`, 1000 + i))
+    const got: number[] = []
+    let jumped = false
+    await walkRange(fakeRelay(all, 10), { kinds: [1] }, 2000, 0, async (events) => {
+      got.push(...events.map((e) => e.created_at))
+      if (jumped) return
+      jumped = true
+      return 1005
+    })
+    expect(got).toContain(1000)
+    expect(got).not.toContain(1050)
+  })
+})
+
+describe('重複だけのページが続いたとき', () => {
+  it('続いたら取得済みの一番古い時刻へ飛ぶ', () => {
+    expect(nextAfterIdle(6, 5000, 1000)).toBe(1000)
+  })
+  it('まだ続いていなければ飛ばない', () => {
+    expect(nextAfterIdle(5, 5000, 1000)).toBeUndefined()
+  })
+  it('取得済みより古い範囲を読んでいるときは飛ばない', () => {
+    expect(nextAfterIdle(6, 900, 1000)).toBeUndefined()
+    expect(nextAfterIdle(6, 5000, undefined)).toBeUndefined()
   })
 })
 

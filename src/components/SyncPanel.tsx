@@ -18,7 +18,11 @@ export function SyncPanel({ sync }: { sync: SyncState }) {
             <div className="sync-line">
               <span>{label}</span>
               <span className="muted">
-                {!p ? '待機中' : phase === 'discovery' ? `${p.count}人` : `${p.count.toLocaleString()}件追加`}
+                {!p
+                  ? '待機中'
+                  : phase === 'discovery'
+                    ? `${p.count}人`
+                    : `${p.count.toLocaleString()}件追加 ・ ${(p.scanned ?? 0).toLocaleString()}件確認 ・ リレー ${p.jobsDone ?? 0}/${p.jobs ?? 0}`}
               </span>
             </div>
             <div className="bar">

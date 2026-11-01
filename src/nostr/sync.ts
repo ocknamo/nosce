@@ -15,6 +15,9 @@ export type SyncProgress = {
   ratio: number
   count: number
   failed: string[]
+  scanned?: number
+  jobsDone?: number
+  jobs?: number
 }
 
 // Nostrの実質的な開始時期。自分の全投稿を読むときの下限
@@ -22,6 +25,10 @@ const NOSTR_EPOCH = Date.UTC(2020, 10, 1) / 1000
 const OVERLAP = 3600
 const AUTHORS_PER_FILTER = 100
 const PAGE_GAP_MS = 150
+// 重複だけのページがこれだけ続いたら、そのリレーは取得済みの範囲を飛ばす
+const IDLE_PAGES = 6
+// 遅いリレーが1つあっても、他のリレーと次の段階を止めないよう並行して読む
+const PHASE_CONCURRENCY = 3
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -37,20 +44,38 @@ type Job = {
   filter: Filter
   lower: number
   save: (events: Event[]) => Promise<number>
+  // 複数のリレーに同じ投稿があるとき、ここより新しい範囲は読み直さず、古い投稿だけ確認する
+  oldestKnown?: () => Promise<number | undefined>
 }
 
+export const nextAfterIdle = (idlePages: number, nextUntil: number, oldest: number | undefined) =>
+  idlePages >= IDLE_PAGES && oldest !== undefined && oldest < nextUntil ? oldest : undefined
+
 // 取得済みの範囲をカーソルに残し、中断しても未取得の範囲だけ読み直す
-async function runJob(pool: RelayPool, job: Job, now: number, onRatio: (r: number) => void, onSaved: (n: number) => void) {
+async function runJob(
+  pool: RelayPool,
+  job: Job,
+  now: number,
+  onRatio: (r: number) => void,
+  onSaved: (added: number, scanned: number) => void,
+) {
   const fetchPage = (f: Filter) => pool.query(job.relay, f)
   const cursor = (await db.cursors.get(job.key)) ?? { key: job.key }
 
   const range = async (high: number, low: number) => {
+    let idlePages = 0
     await walkRange(fetchPage, job.filter, high, low, async (events, nextUntil) => {
-      onSaved(await job.save(events))
-      cursor.pending = { until: nextUntil, low, high }
+      const added = await job.save(events)
+      onSaved(added, events.length)
+      idlePages = added ? 0 : idlePages + 1
+      const jump = nextAfterIdle(idlePages, nextUntil, await job.oldestKnown?.())
+      if (jump !== undefined) idlePages = 0
+      const until = jump ?? nextUntil
+      cursor.pending = { until, low, high }
       await db.cursors.put(cursor)
-      onRatio((high - Math.max(nextUntil, low)) / Math.max(high - low, 1))
+      onRatio((high - Math.max(until, low)) / Math.max(high - low, 1))
       await sleep(PAGE_GAP_MS)
+      return until
     })
     cursor.from = Math.min(cursor.from ?? low, low)
     cursor.to = Math.max(cursor.to ?? high, high)
@@ -88,8 +113,18 @@ async function runPhase(
 ) {
   const ratios = new Array(jobs.length).fill(0)
   let count = 0
+  let scanned = 0
+  let jobsDone = 0
   const emit = () =>
-    report({ phase, ratio: ratios.reduce((a, b) => a + b, 0) / Math.max(jobs.length, 1), count, failed: [...failed] })
+    report({
+      phase,
+      ratio: ratios.reduce((a, b) => a + b, 0) / Math.max(jobs.length, 1),
+      count,
+      failed: [...failed],
+      scanned,
+      jobsDone,
+      jobs: jobs.length,
+    })
   let next = 0
   const worker = async () => {
     while (next < jobs.length) {
@@ -103,11 +138,14 @@ async function runPhase(
             ratios[i] = r
             emit()
           },
-          (n) => {
-            count += n
+          (added, seen) => {
+            count += added
+            scanned += seen
             emit()
           },
         )
+        jobsDone++
+        emit()
       } catch (err) {
         // 容量不足はリレーを変えても解決しないので、取得全体を止めて知らせる
         if (/quota/i.test(`${(err as Error).name} ${(err as Error).message}`)) {
@@ -115,6 +153,7 @@ async function runPhase(
         }
         failed.add(jobs[i].relay)
         ratios[i] = 1
+        jobsDone++
         emit()
       }
     }
@@ -178,8 +217,10 @@ export async function runSync(cfg: SyncConfig, report: (p: SyncProgress) => void
         lower: NOSTR_EPOCH,
         save: (events) =>
           saveEvents(events, { store: 'posts', source: 'me', accept: (e) => e.pubkey === me }),
+        oldestKnown: async () =>
+          (await db.posts.where('[source+created_at]').between(['me', 0], ['me', Infinity]).first())?.created_at,
       })),
-      1,
+      PHASE_CONCURRENCY,
       now,
       report,
       failed,
@@ -199,8 +240,9 @@ export async function runSync(cfg: SyncConfig, report: (p: SyncProgress) => void
             store: 'incoming',
             accept: (e) => e.pubkey !== me && e.tags.some((t) => t[0] === 'p' && t[1] === me),
           }),
+        oldestKnown: async () => (await db.incoming.orderBy('created_at').first())?.created_at,
       })),
-      1,
+      PHASE_CONCURRENCY,
       now,
       report,
       failed,

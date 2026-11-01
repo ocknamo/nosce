@@ -157,6 +157,7 @@ class AppDB extends Dexie {
       results: '++id, createdAt',
       kv: 'key',
     })
+    this.version(2).stores({ incoming: 'id, target, kind, created_at' })
   }
 }
 
